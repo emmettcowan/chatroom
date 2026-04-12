@@ -9,6 +9,7 @@ import (
 )
 
 func Run() {
+	clients := make(map[int]net.Conn)
 	listener, err := net.Listen("tcp", ":8090")
 	if err != nil {
 		log.Fatal("Err listening: ", err)
@@ -21,6 +22,9 @@ func Run() {
 		if err != nil {
 			log.Fatal("Err Accepting con: ", err)
 		}
+		clients[len(clients)+1] = conn
+
+		log.Printf("Clients connected %d", len(clients))
 
 		go handleConnection(conn)
 
