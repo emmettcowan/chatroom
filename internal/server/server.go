@@ -9,15 +9,15 @@ import (
 )
 
 func Run() {
-	listner, err := net.Listen("tcp", ":8090")
+	listener, err := net.Listen("tcp", ":8090")
 	if err != nil {
-		log.Fatal("Err listneing: ", err)
+		log.Fatal("Err listening: ", err)
 	}
 
-	defer listner.Close()
+	defer listener.Close()
 
 	for {
-		conn, err := listner.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			log.Fatal("Err Accepting con: ", err)
 		}
@@ -31,15 +31,19 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
-	message, err := reader.ReadString('\n')
-	if err != nil {
-		log.Printf("Read Error: %v", err)
-	}
+	for {
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			log.Printf("Read Error: %v", err)
+			break
+		}
 
-	ackMsg := strings.ToUpper(strings.TrimSpace(message))
-	response := fmt.Sprintf("ACK : %s\n", ackMsg)
-	_, err = conn.Write([]byte(response))
-	if err != nil {
-		log.Printf("Server wrtie error: %v", err)
+		ackMsg := strings.ToUpper(strings.TrimSpace(message))
+		response := fmt.Sprintf("ACK : %s\n", ackMsg)
+		_, err = conn.Write([]byte(response))
+		if err != nil {
+			log.Printf("Server write error: %v", err)
+			break
+		}
 	}
 }
