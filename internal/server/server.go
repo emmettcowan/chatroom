@@ -6,10 +6,34 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 )
 
+type Clients struct {
+	mu    sync.RWMutex
+	conns map[int]net.Conn
+}
+
+func (clients *Clients) addClient(conn net.Conn) {
+	clients.mu.Lock()
+	clients.conns[len(clients.conns)+1] = conn
+	clients.mu.Unlock()
+}
+
+func (clients *Clients) broadCast(message string) {
+	clients.mu.RLock()
+	for _, conn := range clients.conns {
+		_, err := conn.Write([]byte(message))
+		if err != nil {
+			log.Printf("Server write error: %v", err)
+			break
+		}
+	}
+	clients.mu.RUnlock()
+}
+
 func Run() {
-	clients := make(map[int]net.Conn)
+	clients := Clients{conns: map[int]net.Conn{}}
 	listener, err := net.Listen("tcp", ":8090")
 	if err != nil {
 		log.Fatal("Err listening: ", err)
@@ -22,16 +46,16 @@ func Run() {
 		if err != nil {
 			log.Fatal("Err Accepting con: ", err)
 		}
-		clients[len(clients)+1] = conn
+		clients.addClient(conn)
 
-		log.Printf("Clients connected %d", len(clients))
+		log.Printf("Clients connected %d", len(clients.conns))
 
-		go handleConnection(conn)
+		go handleConnection(conn, &clients)
 
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, clients *Clients) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -44,10 +68,6 @@ func handleConnection(conn net.Conn) {
 
 		ackMsg := strings.ToUpper(strings.TrimSpace(message))
 		response := fmt.Sprintf("ACK : %s\n", ackMsg)
-		_, err = conn.Write([]byte(response))
-		if err != nil {
-			log.Printf("Server write error: %v", err)
-			break
-		}
+		clients.broadCast(response)
 	}
 }

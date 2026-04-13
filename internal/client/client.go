@@ -15,7 +15,7 @@ func Run() {
 	}
 	defer conn.Close()
 
-	go readFromUser(conn)
+	go listenToServer(conn)
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -36,7 +36,7 @@ func Run() {
 	}
 }
 
-func readFromUser(conn net.Conn) {
+func listenToServer(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	for {
 		response, err := reader.ReadString('\n')
