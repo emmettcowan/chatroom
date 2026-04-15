@@ -11,12 +11,18 @@ import (
 
 type Clients struct {
 	mu    sync.RWMutex
-	conns map[int]net.Conn
+	conns map[net.Conn]net.Conn
 }
 
 func (clients *Clients) addClient(conn net.Conn) {
 	clients.mu.Lock()
-	clients.conns[len(clients.conns)+1] = conn
+	clients.conns[conn] = conn
+	clients.mu.Unlock()
+}
+
+func (clients *Clients) removeClient(conn net.Conn) {
+	clients.mu.Lock()
+	delete(clients.conns, conn)
 	clients.mu.Unlock()
 }
 
@@ -33,7 +39,7 @@ func (clients *Clients) broadCast(message string) {
 }
 
 func Run() {
-	clients := Clients{conns: map[int]net.Conn{}}
+	clients := Clients{conns: map[net.Conn]net.Conn{}}
 	listener, err := net.Listen("tcp", ":8090")
 	if err != nil {
 		log.Fatal("Err listening: ", err)
@@ -57,6 +63,7 @@ func Run() {
 
 func handleConnection(conn net.Conn, clients *Clients) {
 	defer conn.Close()
+	defer clients.removeClient(conn)
 
 	reader := bufio.NewReader(conn)
 	for {
