@@ -15,11 +15,12 @@ type model struct {
 	textInput textinput.Model
 	err       error
 	quitting  bool
+	w, h      int
 }
 
 func initialModel() model {
 	ti := textinput.New()
-	ti.Placeholder = "Pikachu"
+	ti.Placeholder = "Say hello"
 	ti.SetVirtualCursor(false)
 	ti.Focus()
 	ti.CharLimit = 156
@@ -38,10 +39,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "enter", "ctrl+c", "esc":
+		case "ctrl+c", "esc", "q":
 			m.quitting = true
 			return m, tea.Quit
+		case "enter":
+			fmt.Println(m.textInput.Value())
+
 		}
+	case tea.WindowSizeMsg:
+		m.w = msg.Width
+		m.h = msg.Height
 	}
 
 	m.textInput, cmd = m.textInput.Update(msg)
@@ -49,24 +56,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
-	var c *tea.Cursor
-	if !m.textInput.VirtualCursor() {
-		c = m.textInput.Cursor()
-		c.Y += lipgloss.Height(m.headerView())
+	if m.w == 0 {
+		return tea.NewView("")
 	}
 
-	str := lipgloss.JoinVertical(lipgloss.Top, m.headerView(), m.textInput.View(), m.footerView())
-	if m.quitting {
-		str += "\n"
-	}
+	box := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		Padding(1)
 
-	v := tea.NewView(str)
-	v.Cursor = c
-	return v
+	top := box.Width(m.w).Render("top\ncontent")
+	bottom := box.Width(m.w).Render(m.textInput.View())
+
+	out := lipgloss.JoinVertical(
+		lipgloss.Top,
+		top,
+		bottom,
+	)
+
+	return tea.NewView(out)
 }
-
-func (m model) headerView() string { return "What’s your favorite Pokémon?\n" }
-func (m model) footerView() string { return "\n(esc to quit)" }
 
 func Run() {
 	conn, err := net.Dial("tcp", ":8090")
