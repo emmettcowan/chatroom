@@ -16,9 +16,10 @@ type model struct {
 	err       error
 	quitting  bool
 	w, h      int
+	conn      net.Conn
 }
 
-func initialModel() model {
+func initialModel(conn net.Conn) model {
 	ti := textinput.New()
 	ti.Placeholder = "Say hello"
 	ti.SetVirtualCursor(false)
@@ -26,7 +27,7 @@ func initialModel() model {
 	ti.CharLimit = 156
 	ti.SetWidth(20)
 
-	return model{textInput: ti}
+	return model{textInput: ti, conn: conn}
 }
 
 func (m model) Init() tea.Cmd {
@@ -43,7 +44,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		case "enter":
-			fmt.Println(m.textInput.Value())
+			_, err := m.conn.Write([]byte(m.textInput.Value()))
+			if err != nil {
+				fmt.Print("Error writing to server")
+			}
+			m.textInput.SetValue("")
 
 		}
 	case tea.WindowSizeMsg:
@@ -61,11 +66,11 @@ func (m model) View() tea.View {
 	}
 
 	box := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
+		Border(lipgloss.RoundedBorder()).
 		Padding(1)
 
-	top := box.Width(m.w).Render("top\ncontent")
-	bottom := box.Width(m.w).Render(m.textInput.View())
+	top := box.Width(m.w).Height(m.h - 5).Render("top\ncontent")
+	bottom := box.Width(m.w).Height(1).Render(m.textInput.View())
 
 	out := lipgloss.JoinVertical(
 		lipgloss.Top,
@@ -84,7 +89,7 @@ func Run() {
 	defer conn.Close()
 
 	go listenToServer(conn)
-	p := tea.NewProgram(initialModel())
+	p := tea.NewProgram(initialModel(conn))
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
