@@ -12,7 +12,6 @@ import (
 
 type model struct {
 	textInput textinput.Model
-	err       error
 	quitting  bool
 	w, h      int
 	conn      net.Conn
@@ -86,6 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.h = msg.Height
 	case incommingMsg:
 		m.recvied += msg.message
+		return m, reviceFromServer(m.ch)
 	}
 
 	m.textInput, cmd = m.textInput.Update(msg)

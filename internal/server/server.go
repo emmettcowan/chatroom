@@ -29,7 +29,6 @@ func (clients *Clients) removeClient(conn net.Conn) {
 func (clients *Clients) broadCast(message string) {
 	clients.mu.RLock()
 	for _, conn := range clients.conns {
-		fmt.Print(message)
 		_, err := conn.Write([]byte(message))
 		if err != nil {
 			log.Printf("Server write error: %v", err)
@@ -76,7 +75,6 @@ func handleConnection(conn net.Conn, clients *Clients) {
 
 		ackMsg := strings.TrimSpace(message)
 		response := fmt.Sprintf("%s\n", ackMsg)
-		fmt.Println(response)
 		clients.broadCast(response)
 	}
 }
