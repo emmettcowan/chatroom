@@ -2,7 +2,6 @@ package client
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"net"
 
@@ -17,9 +16,11 @@ type model struct {
 	quitting  bool
 	w, h      int
 	conn      net.Conn
+	ch        chan incommingMsg
+	recvied   string
 }
 
-func initialModel(conn net.Conn) model {
+func initialModel(conn net.Conn, ch chan incommingMsg) model {
 	ti := textinput.New()
 	ti.Placeholder = "Say hello"
 	ti.SetVirtualCursor(false)
@@ -27,11 +28,40 @@ func initialModel(conn net.Conn) model {
 	ti.CharLimit = 156
 	ti.SetWidth(20)
 
-	return model{textInput: ti, conn: conn}
+	return model{textInput: ti, conn: conn, ch: ch}
+}
+
+type incommingMsg struct {
+	message string
+}
+
+func listenToServer(conn net.Conn, ch chan incommingMsg) {
+	reader := bufio.NewReader(conn)
+	for {
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			ch <- incommingMsg{
+				"\nDisconnected from server\n",
+			}
+			return
+		}
+		ch <- incommingMsg{
+			response,
+		}
+	}
+}
+
+func reviceFromServer(sub chan incommingMsg) tea.Cmd {
+	return func() tea.Msg {
+		return <-sub
+	}
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(
+		textinput.Blink,
+		reviceFromServer(m.ch),
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -44,9 +74,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		case "enter":
-			_, err := m.conn.Write([]byte(m.textInput.Value()))
+			_, err := m.conn.Write([]byte(m.textInput.Value() + "\n"))
 			if err != nil {
-				fmt.Print("Error writing to server")
+				log.Printf("Error writing to server: %v", err)
 			}
 			m.textInput.SetValue("")
 
@@ -54,6 +84,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
 		m.h = msg.Height
+	case incommingMsg:
+		m.recvied += msg.message
 	}
 
 	m.textInput, cmd = m.textInput.Update(msg)
@@ -69,7 +101,7 @@ func (m model) View() tea.View {
 		Border(lipgloss.RoundedBorder()).
 		Padding(1)
 
-	top := box.Width(m.w).Height(m.h - 5).Render("top\ncontent")
+	top := box.Width(m.w).Height(m.h - 5).Render(m.recvied)
 	bottom := box.Width(m.w).Height(1).Render(m.textInput.View())
 
 	out := lipgloss.JoinVertical(
@@ -88,39 +120,11 @@ func Run() {
 	}
 	defer conn.Close()
 
-	go listenToServer(conn)
-	p := tea.NewProgram(initialModel(conn))
+	ch := make(chan incommingMsg)
+
+	go listenToServer(conn, ch)
+	p := tea.NewProgram(initialModel(conn, ch))
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
-	}
-
-	// reader := bufio.NewReader(os.Stdin)
-	// for {
-	// 	fmt.Print(">: ")
-	// 	text, err := reader.ReadString('\n')
-	// 	if err != nil {
-	// 		if err != os.ErrClosed {
-	// 			log.Printf("Error reading stdin: %v", err)
-	// 		}
-	// 		break
-	// 	}
-	//
-	// 	_, err = conn.Write([]byte(text))
-	// 	if err != nil {
-	// 		fmt.Printf("Error writing to connection: %v\n", err)
-	// 		break
-	// 	}
-	// }
-}
-
-func listenToServer(conn net.Conn) {
-	reader := bufio.NewReader(conn)
-	for {
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Printf("\nDisconnected from server: %v\n", err)
-			return
-		}
-		fmt.Printf("\rServer: %s>: ", response)
 	}
 }
