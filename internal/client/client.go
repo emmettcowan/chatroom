@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/emmettcowan/chatroom/internal/client/username"
 )
 
 type model struct {
@@ -17,9 +18,10 @@ type model struct {
 	conn      net.Conn
 	ch        chan incommingMsg
 	recvied   string
+	username  string
 }
 
-func initialModel(conn net.Conn, ch chan incommingMsg) model {
+func initialModel(conn net.Conn, ch chan incommingMsg, username string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Say hello"
 	ti.SetVirtualCursor(false)
@@ -27,7 +29,7 @@ func initialModel(conn net.Conn, ch chan incommingMsg) model {
 	ti.CharLimit = 156
 	ti.SetWidth(20)
 
-	return model{textInput: ti, conn: conn, ch: ch}
+	return model{textInput: ti, conn: conn, ch: ch, username: username}
 }
 
 type incommingMsg struct {
@@ -69,11 +71,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc", "q":
+		case "ctrl+c", "esc":
 			m.quitting = true
 			return m, tea.Quit
 		case "enter":
-			_, err := m.conn.Write([]byte(m.textInput.Value() + "\n"))
+			_, err := m.conn.Write([]byte(m.username + ":  " + m.textInput.Value() + "\n"))
 			if err != nil {
 				log.Printf("Error writing to server: %v", err)
 			}
@@ -114,6 +116,12 @@ func (m model) View() tea.View {
 }
 
 func Run() {
+	usernameScreen := tea.NewProgram(username.UsernameScreen())
+	m, err := usernameScreen.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+	usernameModel := m.(username.UsernameModel)
 	conn, err := net.Dial("tcp", ":8090")
 	if err != nil {
 		log.Fatal("Error connecting: ", err)
@@ -123,7 +131,7 @@ func Run() {
 	ch := make(chan incommingMsg)
 
 	go listenToServer(conn, ch)
-	p := tea.NewProgram(initialModel(conn, ch))
+	p := tea.NewProgram(initialModel(conn, ch, usernameModel.Username))
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
