@@ -21,6 +21,9 @@ type model struct {
 	username  string
 }
 
+// TODO: Use state to swap between the login and test screen at some point
+// currently running one tui before the next
+
 func initialModel(conn net.Conn, ch chan incommingMsg, username string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Say hello"
@@ -42,7 +45,7 @@ func listenToServer(conn net.Conn, ch chan incommingMsg) {
 		response, err := reader.ReadString('\n')
 		if err != nil {
 			ch <- incommingMsg{
-				"\nDisconnected from server\n",
+				"Disconnected from server\n",
 			}
 			return
 		}
@@ -103,16 +106,19 @@ func (m model) View() tea.View {
 		Border(lipgloss.RoundedBorder()).
 		Padding(1)
 
-	top := box.Width(m.w).Height(m.h - 5).Render(m.recvied)
+	top := box.Width(m.w).Height(m.h - 6).Render(m.recvied)
 	bottom := box.Width(m.w).Height(1).Render(m.textInput.View())
 
 	out := lipgloss.JoinVertical(
 		lipgloss.Top,
 		top,
 		bottom,
+		"esc to quit",
 	)
 
-	return tea.NewView(out)
+	v := tea.NewView(out)
+	v.AltScreen = true
+	return v
 }
 
 func Run() {

@@ -61,9 +61,9 @@ func (m UsernameModel) View() tea.View {
 
 	v := tea.NewView(str)
 	v.Cursor = c
+	v.AltScreen = true
 	return v
 }
 
 func (m UsernameModel) headerView() string { return "Whats your username?\n" }
 func (m UsernameModel) footerView() string { return "\n(esc to quit)" }
-
