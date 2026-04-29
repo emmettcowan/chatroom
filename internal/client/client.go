@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/compat"
 	"github.com/emmettcowan/chatroom/internal/client/username"
 )
 
@@ -97,24 +98,53 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+var (
+	titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#7D56F4")).
+			Padding(0, 1).
+			MarginLeft(1)
+
+	borderStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("62")).
+			Padding(0, 1)
+
+	subtleStyle = lipgloss.NewStyle().
+			Foreground(compat.AdaptiveColor{
+			Light: lipgloss.Color("#9B9B9B"),
+			Dark:  lipgloss.Color("#5C5C5C"),
+		})
+)
+
 func (m model) View() tea.View {
 	if m.w == 0 {
 		return tea.NewView("")
 	}
 
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		Padding(1)
+	header := titleStyle.Render("Chatroom")
+	usernameDisplay := subtleStyle.Render("Logged in as: ") + lipgloss.NewStyle().Foreground(lipgloss.Color("170")).Render(m.username)
 
-	top := box.Width(m.w).Height(m.h - 6).Render(m.recvied)
-	bottom := box.Width(m.w).Height(1).Render(m.textInput.View())
+	messages := m.recvied
+	if messages == "" {
+		messages = subtleStyle.Render("No messages yet...")
+	}
+	msgBox := borderStyle.Width(m.w - 4).Height(m.h - 9).Render(messages)
 
-	out := lipgloss.JoinVertical(
-		lipgloss.Top,
-		top,
-		bottom,
-		"esc to quit",
+	inputBox := borderStyle.Width(m.w - 4).BorderForeground(lipgloss.Color("170")).Render(m.textInput.View())
+
+	help := subtleStyle.Render("esc: quit enter: send")
+
+	ui := lipgloss.JoinVertical(
+		lipgloss.Left,
+		header+" "+usernameDisplay,
+		msgBox,
+		inputBox,
+		help,
 	)
+
+	out := lipgloss.NewStyle().Padding(1, 2).Render(ui)
 
 	v := tea.NewView(out)
 	v.AltScreen = true
